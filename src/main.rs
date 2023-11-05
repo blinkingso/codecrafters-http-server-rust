@@ -2,7 +2,7 @@
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 
-use anyhow::Result;
+use anyhow::{Error, Result};
 
 fn main() -> Result<()> {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -35,15 +35,54 @@ fn handle_client_request(mut stream: TcpStream) {
     if let Some(header) = lines.get(0) {
         let mut line = header.split_whitespace();
         let _method = line.next().unwrap();
+        let method = HttpMethod::try_from(_method).unwrap();
         let path = line.next().unwrap();
         match path {
             "/" => {
                 stream.write_all(b"HTTP/1.1 200 OK\r\n\r\n").unwrap();
             }
-            _ => {
-                stream.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n").unwrap();
+            path => {
+                if path.starts_with("/echo") {
+                    let mut response_content = path.split("/");
+                    let _ = response_content.next();
+                    let _ = response_content.next();
+                    let _response_content = response_content.next().unwrap_or("");
+                    let bytes = _response_content.bytes().len();
+                    stream.write(b"HTTP/1.1 200 OK\r\n").unwrap();
+                    stream.write(b"Content-Type: text/plain\r\n").unwrap();
+                    stream
+                        .write(format!("Content-Length: {}\r\n\r\n", bytes).as_bytes())
+                        .unwrap();
+                    stream
+                        .write(format!("{}\r\n", _response_content).as_bytes())
+                        .unwrap();
+                } else {
+                    stream.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n").unwrap();
+                }
             }
         }
         stream.flush().unwrap();
+    }
+}
+
+enum HttpMethod {
+    Get,
+    Post,
+    Put,
+    Delete,
+    Trace,
+}
+
+impl TryFrom<&str> for HttpMethod {
+    type Error = anyhow::Error;
+    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
+        Ok(match value.as_bytes() {
+            b"GET" => HttpMethod::Get,
+            b"POST" => HttpMethod::Post,
+            b"PUT" => HttpMethod::Put,
+            b"TRACE" => HttpMethod::Trace,
+            b"DELETE" => HttpMethod::Delete,
+            _ => return Err(Error::msg("Method not supported!")),
+        })
     }
 }
