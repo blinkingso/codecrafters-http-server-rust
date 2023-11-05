@@ -3,6 +3,7 @@ use std::fs::File;
 // Uncomment this block to pass the first stage
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
+use std::path::Path;
 
 use anyhow::{Error, Result};
 
@@ -71,9 +72,22 @@ fn handle_client_request(mut stream: TcpStream) {
                         .write(format!("{}\r\n", response_content).as_bytes())
                         .unwrap();
                 } else if path.starts_with("/file/") {
-                    let filename = path
-                        .strip_prefix("/file/")
-                        .and_then(|file| File::open(file).ok());
+                    let mut args = std::env::args();
+                    let dir = args
+                        .next()
+                        .and_then(|s| {
+                            if s.eq("--directory") {
+                                args.next().and_then(|s| Some(s.trim().to_string()))
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or(".".to_string());
+                    let filename = path.strip_prefix("/file/").and_then(|file| {
+                        let mut path = Path::new(dir.as_str()).to_path_buf();
+                        path.push(file);
+                        File::open(path).ok()
+                    });
                     if let Some(file) = filename {
                         stream.write_all(b"HTTP/1.1 200 OK\r\n").unwrap();
                         stream
