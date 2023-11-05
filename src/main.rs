@@ -86,6 +86,7 @@ fn handle_client_request(mut stream: TcpStream) {
                     let filename = path.strip_prefix("/file/").and_then(|file| {
                         let mut path = Path::new(dir.as_str()).to_path_buf();
                         path.push(file);
+                        println!("path: {:?}", path);
                         File::open(path).ok()
                     });
                     if let Some(file) = filename {
