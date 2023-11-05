@@ -71,7 +71,7 @@ fn handle_client_request(mut stream: TcpStream) {
                     stream
                         .write(format!("{}\r\n", response_content).as_bytes())
                         .unwrap();
-                } else if path.starts_with("/file/") {
+                } else if path.starts_with("/files/") {
                     let mut args = std::env::args();
                     let dir = args
                         .next()
@@ -83,7 +83,7 @@ fn handle_client_request(mut stream: TcpStream) {
                             }
                         })
                         .unwrap_or(".".to_string());
-                    let filename = path.strip_prefix("/file/").and_then(|file| {
+                    let filename = path.strip_prefix("/files/").and_then(|file| {
                         let mut path = Path::new(dir.as_str()).to_path_buf();
                         path.push(file);
                         println!("path: {:?}", path);
