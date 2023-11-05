@@ -42,19 +42,16 @@ fn handle_client_request(mut stream: TcpStream) {
                 stream.write_all(b"HTTP/1.1 200 OK\r\n\r\n").unwrap();
             }
             path => {
-                if path.starts_with("/echo") {
-                    let mut response_content = path.split("/");
-                    let _ = response_content.next();
-                    let _ = response_content.next();
-                    let _response_content = response_content.next().unwrap_or("");
-                    let bytes = _response_content.bytes().len();
+                if path.starts_with("/echo") && method == HttpMethod::Get {
+                    let response_content = path.strip_prefix("/echo").unwrap_or("");
+                    let bytes = response_content.bytes().len();
                     stream.write(b"HTTP/1.1 200 OK\r\n").unwrap();
                     stream.write(b"Content-Type: text/plain\r\n").unwrap();
                     stream
                         .write(format!("Content-Length: {}\r\n\r\n", bytes).as_bytes())
                         .unwrap();
                     stream
-                        .write(format!("{}\r\n", _response_content).as_bytes())
+                        .write(format!("{}\r\n", response_content).as_bytes())
                         .unwrap();
                 } else {
                     stream.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n").unwrap();
@@ -65,6 +62,7 @@ fn handle_client_request(mut stream: TcpStream) {
     }
 }
 
+#[derive(PartialEq, Eq)]
 enum HttpMethod {
     Get,
     Post,
