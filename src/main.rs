@@ -42,9 +42,9 @@ fn handle_client_request(mut stream: TcpStream) {
                 stream.write_all(b"HTTP/1.1 200 OK\r\n\r\n").unwrap();
             }
             path => {
-                if path.starts_with("/echo") && method == HttpMethod::Get {
+                if path.starts_with("/echo/") && method == HttpMethod::Get {
                     let response_content = path.strip_prefix("/echo").unwrap_or("");
-                    let bytes = response_content.len();
+                    let bytes = response_content.as_bytes().len();
                     stream.write(b"HTTP/1.1 200 OK\r\n").unwrap();
                     stream.write(b"Content-Type: text/plain\r\n").unwrap();
                     stream
