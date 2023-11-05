@@ -79,15 +79,13 @@ fn handle_client_request(mut stream: TcpStream) {
                         stream
                             .write_all(b"Content-Type: application/octet-stream\r\n")
                             .unwrap();
-                        let data = std::io::read_to_string(BufReader::new(file)).unwrap();
+                        let reader = BufReader::new(file);
+                        let length = reader.buffer().len();
                         stream
-                            .write_all(
-                                format!("Content-Length: {}\r\n\r\n", data.as_bytes().len())
-                                    .as_bytes(),
-                            )
+                            .write_all(format!("Content-Length: {}\r\n\r\n", length).as_bytes())
                             .unwrap();
 
-                        stream.write_all(data.as_bytes()).unwrap();
+                        stream.write_all(reader.buffer()).unwrap();
                         stream.write_all("\r\n".as_bytes()).unwrap();
                     }
                 } else {
