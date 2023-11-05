@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 // Uncomment this block to pass the first stage
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
@@ -41,6 +42,19 @@ fn handle_client_request(mut stream: TcpStream) {
             "/" => {
                 stream.write_all(b"HTTP/1.1 200 OK\r\n\r\n").unwrap();
             }
+            "/user-agent" => {
+                let headers = parse_headers(&lines);
+                let user_agent = headers.get("User-Agent").unwrap();
+                let bytes = user_agent.as_bytes().len();
+                stream.write(b"HTTP/1.1 200 OK\r\n").unwrap();
+                stream.write(b"Content-Type: text/plain\r\n").unwrap();
+                stream
+                    .write(format!("Content-Length: {}\r\n\r\n", bytes).as_bytes())
+                    .unwrap();
+                stream
+                    .write(format!("{}\r\n", user_agent).as_bytes())
+                    .unwrap();
+            }
             path => {
                 if path.starts_with("/echo/") && method == HttpMethod::Get {
                     let response_content = path.strip_prefix("/echo/").unwrap_or("");
@@ -60,6 +74,18 @@ fn handle_client_request(mut stream: TcpStream) {
         }
         stream.flush().unwrap();
     }
+}
+
+fn parse_headers(headers: &Vec<String>) -> HashMap<&str, &str> {
+    headers
+        .iter()
+        .skip(1)
+        .filter(|s| !s.trim().is_empty())
+        .map(|header| {
+            let (key, value) = header.split_once(":").unwrap();
+            (key.trim(), value.trim())
+        })
+        .collect::<HashMap<&str, &str>>()
 }
 
 #[derive(PartialEq, Eq)]
