@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fs::File;
 // Uncomment this block to pass the first stage
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
@@ -69,6 +70,26 @@ fn handle_client_request(mut stream: TcpStream) {
                     stream
                         .write(format!("{}\r\n", response_content).as_bytes())
                         .unwrap();
+                } else if path.starts_with("/file/") {
+                    let filename = path
+                        .strip_prefix("/file/")
+                        .and_then(|file| File::open(file).ok());
+                    if let Some(file) = filename {
+                        stream.write_all(b"HTTP/1.1 200 OK\r\n").unwrap();
+                        stream
+                            .write_all(b"Content-Type: application/octet-stream\r\n")
+                            .unwrap();
+                        let data = std::io::read_to_string(BufReader::new(file)).unwrap();
+                        stream
+                            .write_all(
+                                format!("Content-Length: {}\r\n\r\n", data.as_bytes().len())
+                                    .as_bytes(),
+                            )
+                            .unwrap();
+
+                        stream.write_all(data.as_bytes()).unwrap();
+                        stream.write_all("\r\n".as_bytes()).unwrap();
+                    }
                 } else {
                     stream.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n").unwrap();
                 }
