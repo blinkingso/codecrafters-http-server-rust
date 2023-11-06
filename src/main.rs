@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::fs::File;
 // Uncomment this block to pass the first stage
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
