@@ -68,7 +68,8 @@ fn handle_client_request(mut stream: TcpStream) {
                         .write(format!("Content-Length: {}\r\n\r\n", bytes).as_bytes())
                         .unwrap();
                     stream
-                        .write(format!("{}\r\n", response_content).as_bytes())
+                        // .write(format!("{}\r\n", response_content).as_bytes())
+                        .write(response_content.as_bytes())
                         .unwrap();
                 } else if path.starts_with("/files/") {
                     let mut args = std::env::args();
