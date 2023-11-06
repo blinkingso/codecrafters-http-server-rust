@@ -87,20 +87,18 @@ fn handle_client_request(mut stream: TcpStream) {
                         let mut path = Path::new(dir.as_str()).to_path_buf();
                         path.push(file);
                         println!("path: {:?}", path);
-                        File::open(path).ok()
+                        std::fs::read(path).ok()
                     });
                     if let Some(file) = filename {
                         stream.write_all(b"HTTP/1.1 200 OK\r\n").unwrap();
                         stream
                             .write_all(b"Content-Type: application/octet-stream\r\n")
                             .unwrap();
-                        let reader = BufReader::new(file);
-                        let length = reader.buffer().len();
                         stream
-                            .write_all(format!("Content-Length: {}\r\n\r\n", length).as_bytes())
+                            .write_all(format!("Content-Length: {}\r\n\r\n", file.len()).as_bytes())
                             .unwrap();
 
-                        stream.write_all(reader.buffer()).unwrap();
+                        stream.write_all(&file).unwrap();
                         stream.write_all("\r\n".as_bytes()).unwrap();
                     }
                 } else {
