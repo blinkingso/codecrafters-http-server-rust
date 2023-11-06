@@ -73,15 +73,9 @@ fn handle_client_request(mut stream: TcpStream) {
                 } else if path.starts_with("/files/") {
                     let mut args = std::env::args();
                     let dir = args
-                        .next()
-                        .and_then(|s| {
-                            if s.eq("--directory") {
-                                args.next().and_then(|s| Some(s.trim().to_string()))
-                            } else {
-                                None
-                            }
-                        })
-                        .unwrap_or(".".to_string());
+                        .nth(2)
+                        .and_then(|s| Some(s.trim().to_string()))
+                        .unwrap_or_default();
                     let filename = path.strip_prefix("/files/").and_then(|file| {
                         let mut path = Path::new(dir.as_str()).to_path_buf();
                         path.push(file);
