@@ -93,6 +93,8 @@ fn handle_client_request(mut stream: TcpStream) {
                             .unwrap();
 
                         stream.write_all(&file).unwrap();
+                    } else {
+                        stream.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n").unwrap();
                     }
                 } else {
                     stream.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n").unwrap();
