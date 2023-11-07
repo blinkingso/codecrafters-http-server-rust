@@ -98,7 +98,7 @@ fn handle_client_request(mut stream: TcpStream) {
                     if let Some(file) = filename {
                         ok201(&mut stream, file.as_slice(), "application/octet-stream");
                     } else {
-                        not_found(&mut stream);
+                        ok201(&mut stream, "file not found".as_bytes(), "text/plain");
                     }
                 }
 
