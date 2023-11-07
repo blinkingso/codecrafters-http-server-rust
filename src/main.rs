@@ -93,11 +93,10 @@ fn handle_client_request(mut stream: TcpStream) {
                     let filename = path.strip_prefix("/files/").and_then(|file| {
                         let mut path = Path::new(dir.as_str()).to_path_buf();
                         path.push(file);
-                        println!("path: {:?}", path);
                         std::fs::read(path).ok()
                     });
                     if let Some(file) = filename {
-                        ok(&mut stream, file.as_slice(), "application/octet-stream");
+                        ok201(&mut stream, file.as_slice(), "application/octet-stream");
                     } else {
                         not_found(&mut stream);
                     }
@@ -117,6 +116,17 @@ fn not_found(stream: &mut TcpStream) {
 
 fn ok(stream: &mut TcpStream, body: &[u8], content_type: &str) {
     stream.write(b"HTTP/1.1 200 OK\r\n").unwrap();
+    stream
+        .write(format!("Content-Type: {}\r\n", content_type).as_bytes())
+        .unwrap();
+    stream
+        .write(format!("Content-Length: {}\r\n\r\n", body.len()).as_bytes())
+        .unwrap();
+    stream.write_all(body).unwrap();
+}
+
+fn ok201(stream: &mut TcpStream, body: &[u8], content_type: &str) {
+    stream.write(b"HTTP/1.1 201 OK\r\n").unwrap();
     stream
         .write(format!("Content-Type: {}\r\n", content_type).as_bytes())
         .unwrap();
