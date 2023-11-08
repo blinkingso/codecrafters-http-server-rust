@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fs::create_dir;
 // Uncomment this block to pass the first stage
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
@@ -42,6 +43,8 @@ fn handle_client_request(mut stream: TcpStream) {
         .map(|b| b.unwrap())
         .take_while(|line| !line.is_empty())
         .collect();
+    let headers: Vec<HttpHeader> = lines.iter().skip(1).map(HttpHeader::new).collect();
+    println!("http headers: {:?}", headers);
     if let Some(header) = lines.get(0) {
         let mut line = header.split_whitespace();
         let _method = line.next().unwrap();
@@ -90,16 +93,24 @@ fn handle_client_request(mut stream: TcpStream) {
                         .nth(2)
                         .and_then(|s| Some(s.trim().to_string()))
                         .unwrap_or_default();
-                    let filename = path.strip_prefix("/files/").and_then(|file| {
+                    let path = path.strip_prefix("/files/").and_then(|file| {
                         let mut path = Path::new(dir.as_str()).to_path_buf();
+                        if !path.exists() {
+                            let _ = create_dir(&path);
+                        }
                         path.push(file);
-                        std::fs::read(path).ok()
+                        Some(path)
                     });
-                    if let Some(file) = filename {
-                        ok201(&mut stream, file.as_slice(), "application/octet-stream");
+
+                    // read file bytes from stream.
+                    // buf.consume(amt)
+                    // println!("data: {:?}", lines.get(&String::from("Content-Length")));
+
+                    if let Some(file) = path {
+                        // ok201(&mut stream, file.as_slice(), "application/octet-stream");
                     } else {
-                        ok201(&mut stream, "file not found".as_bytes(), "text/plain");
                     }
+                    ok201(&mut stream, "file not found".as_bytes(), "text/plain");
                 }
 
                 _ => not_found(&mut stream),
@@ -168,5 +179,23 @@ impl TryFrom<&str> for HttpMethod {
             b"DELETE" => HttpMethod::Delete,
             _ => return Err(Error::msg("Method not supported!")),
         })
+    }
+}
+
+#[derive(Debug)]
+struct HttpHeader {
+    name: String,
+    value: String,
+}
+
+impl HttpHeader {
+    pub fn new(line: impl AsRef<str>) -> Self {
+        let (k, v) = line.as_ref().split_once(":").unwrap();
+        let k = k.trim();
+        let v = v.trim();
+        HttpHeader {
+            name: k.to_string(),
+            value: v.to_string(),
+        }
     }
 }
