@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs::create_dir;
 // Uncomment this block to pass the first stage
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 
@@ -103,11 +103,22 @@ fn handle_client_request(mut stream: TcpStream) {
                     });
 
                     // read file bytes from stream.
-                    // buf.consume(amt)
-                    // println!("data: {:?}", lines.get(&String::from("Content-Length")));
 
                     if let Some(file) = path {
                         // ok201(&mut stream, file.as_slice(), "application/octet-stream");
+                        let content_length = headers
+                            .iter()
+                            .find(|h| h.name.eq_ignore_ascii_case("Content-Length"))
+                            .unwrap()
+                            .value
+                            .parse::<usize>()
+                            .unwrap();
+
+                        let mut buf = Vec::new();
+                        stream.read_to_end(&mut buf).unwrap();
+                        let start = buf.len() - content_length;
+                        std::fs::write(file, &buf[start..]).unwrap();
+                        ok201(&mut stream, "write ok".as_bytes(), "text/plain");
                     } else {
                     }
                     ok201(&mut stream, "file not found".as_bytes(), "text/plain");
