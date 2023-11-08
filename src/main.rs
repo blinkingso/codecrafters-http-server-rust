@@ -116,6 +116,7 @@ fn handle_client_request(mut stream: TcpStream) {
 
                         let mut buf = Vec::new();
                         stream.read_to_end(&mut buf).unwrap();
+                        println!("{} => {}", buf.len(), content_length);
                         let start = buf.len() - content_length;
                         std::fs::write(file, &buf[start..]).unwrap();
                         ok201(&mut stream, "write ok".as_bytes(), "text/plain");
