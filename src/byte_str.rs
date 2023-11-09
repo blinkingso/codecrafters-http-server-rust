@@ -1,5 +1,6 @@
+#![allow(dead_code)]
+
 use bytes::Bytes;
-use nom::AsBytes;
 use std::{ops, str};
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]

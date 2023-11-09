@@ -5,8 +5,7 @@ use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 
 use anyhow::{Error, Result};
-
-use crate::help::parse_request;
+use help::HttpRequest;
 
 mod byte_str;
 mod header;
@@ -39,84 +38,108 @@ fn main() -> Result<()> {
 }
 
 fn handle_client_request(mut stream: TcpStream) {
-    let mut buf = vec![];
-    stream
-        .read_to_end(&mut buf)
-        .expect("Failed to read from tcp stream");
-    let req = parse_request(&buf[..]).expect("Failed to parse http request");
-
-    if let Some(req) = req {
-        let method = HttpMethod::try_from(req.method).unwrap();
-        let path = req.path;
-        match method {
-            HttpMethod::Get => match path {
-                "/" => {
-                    stream.write_all(b"HTTP/1.1 200 OK\r\n\r\n").unwrap();
-                }
-                "/user-agent" => {
-                    let user_agent = req.headers.get("User-Agent").unwrap();
-                    ok(&mut stream, user_agent.as_bytes(), "text/plain");
-                }
-                path => {
-                    if path.starts_with("/echo/") && method == HttpMethod::Get {
-                        let response_content = path.strip_prefix("/echo/").unwrap_or("");
-                        ok(&mut stream, response_content.as_bytes(), "text/plain");
-                    } else if path.starts_with("/files/") {
-                        let mut args = std::env::args();
-                        let dir = args
-                            .nth(2)
-                            .and_then(|s| Some(s.trim().to_string()))
-                            .unwrap_or_default();
-                        let filename = path.strip_prefix("/files/").and_then(|file| {
-                            let mut path = Path::new(dir.as_str()).to_path_buf();
-                            path.push(file);
-                            println!("path: {:?}", path);
-                            std::fs::read(path).ok()
-                        });
-                        if let Some(file) = filename {
-                            ok(&mut stream, file.as_slice(), "application/octet-stream");
-                        } else {
-                            not_found(&mut stream);
-                        }
-                    } else {
-                        not_found(&mut stream);
+    let mut buf = [0_u8; 1024];
+    loop {
+        match stream.read(&mut buf) {
+            Ok(0) => {
+                break;
+            }
+            Ok(len) => {
+                if let Ok((rest, Some(mut req))) = HttpRequest::parse_request(&buf[..len]) {
+                    let mut body = rest.to_vec();
+                    if req.body_len > 0 {
+                        body.resize(req.body_len, 0);
+                        stream.read_exact(&mut body[rest.len()..]).unwrap();
+                        req.set_body(&body);
                     }
-                }
-            },
-            HttpMethod::Post => match path {
-                path if path.starts_with("/files/") => {
-                    let mut args = std::env::args();
-                    let dir = args
-                        .nth(2)
-                        .and_then(|s| Some(s.trim().to_string()))
-                        .unwrap_or_default();
-                    let path = path.strip_prefix("/files/").and_then(|file| {
-                        let mut path = Path::new(dir.as_str()).to_path_buf();
-                        if !path.exists() {
-                            let _ = create_dir(&path);
-                        }
-                        path.push(file);
-                        Some(path)
-                    });
 
-                    // read file bytes from stream.
+                    // todo handle business and response
+                    let method = HttpMethod::try_from(req.method).unwrap();
+                    let path = req.path;
+                    match method {
+                        HttpMethod::Get => match path {
+                            "/" => {
+                                stream.write_all(b"HTTP/1.1 200 OK\r\n\r\n").unwrap();
+                            }
+                            "/user-agent" => {
+                                let user_agent = req.headers.get("User-Agent").unwrap();
+                                ok(&mut stream, user_agent.as_bytes(), "text/plain");
+                            }
+                            path => {
+                                if path.starts_with("/echo/") && method == HttpMethod::Get {
+                                    let response_content =
+                                        path.strip_prefix("/echo/").unwrap_or("");
+                                    ok(&mut stream, response_content.as_bytes(), "text/plain");
+                                } else if path.starts_with("/files/") {
+                                    let mut args = std::env::args();
+                                    let dir = args
+                                        .nth(2)
+                                        .and_then(|s| Some(s.trim().to_string()))
+                                        .unwrap_or_default();
+                                    let filename = path.strip_prefix("/files/").and_then(|file| {
+                                        let mut path = Path::new(dir.as_str()).to_path_buf();
+                                        path.push(file);
+                                        println!("path: {:?}", path);
+                                        std::fs::read(path).ok()
+                                    });
+                                    if let Some(file) = filename {
+                                        ok(
+                                            &mut stream,
+                                            file.as_slice(),
+                                            "application/octet-stream",
+                                        );
+                                    } else {
+                                        not_found(&mut stream);
+                                    }
+                                } else {
+                                    not_found(&mut stream);
+                                }
+                            }
+                        },
+                        HttpMethod::Post => match path {
+                            path if path.starts_with("/files/") => {
+                                let mut args = std::env::args();
+                                let dir = args
+                                    .nth(2)
+                                    .and_then(|s| Some(s.trim().to_string()))
+                                    .unwrap_or_default();
+                                let path = path.strip_prefix("/files/").and_then(|file| {
+                                    let mut path = Path::new(dir.as_str()).to_path_buf();
+                                    if !path.exists() {
+                                        let _ = create_dir(&path);
+                                    }
+                                    path.push(file);
+                                    Some(path)
+                                });
 
-                    if let Some(file) = path {
-                        // ok201(&mut stream, file.as_slice(), "application/octet-stream");
-                        if let Some(body) = req.body {
-                            std::fs::write(file, body).unwrap();
-                        }
-                        ok201(&mut stream, "write ok".as_bytes(), "text/plain");
-                    } else {
+                                // read file bytes from stream.
+
+                                if let Some(file) = path {
+                                    // ok201(&mut stream, file.as_slice(), "application/octet-stream");
+                                    if let Some(body) = req.body {
+                                        std::fs::write(file, body).unwrap();
+                                    }
+                                    ok201(&mut stream, "write ok".as_bytes(), "text/plain");
+                                } else {
+                                }
+                                ok201(&mut stream, "file not found".as_bytes(), "text/plain");
+                            }
+
+                            _ => not_found(&mut stream),
+                        },
+                        _ => {}
                     }
-                    ok201(&mut stream, "file not found".as_bytes(), "text/plain");
+                    stream.flush().unwrap();
+                    break;
+                } else {
+                    // incomplete request, continue read more bytes from client.
+                    continue;
                 }
-
-                _ => not_found(&mut stream),
-            },
-            _ => {}
+            }
+            Err(e) => {
+                panic!("failed to read from stream for: {:?}", e);
+            }
         }
-        stream.flush().unwrap();
     }
 }
 

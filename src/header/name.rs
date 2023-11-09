@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use core::fmt;
 use std::{borrow::Borrow, error::Error, hash::Hash, mem::MaybeUninit, str::FromStr};
 
