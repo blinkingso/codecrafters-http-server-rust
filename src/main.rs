@@ -1,7 +1,6 @@
-use std::collections::HashMap;
 use std::fs::create_dir;
 // Uncomment this block to pass the first stage
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 
@@ -40,14 +39,11 @@ fn main() -> Result<()> {
 }
 
 fn handle_client_request(mut stream: TcpStream) {
-    let buf = BufReader::new(&mut stream);
-    let buf = buf.buffer();
-    let req = parse_request(buf).expect("Failed to parse http request");
-    let lines: Vec<String> = buf
-        .lines()
-        .map(|b| b.unwrap())
-        .take_while(|line| !line.is_empty())
-        .collect();
+    let mut buf = vec![];
+    stream
+        .read_to_end(&mut buf)
+        .expect("Failed to read from tcp stream");
+    let req = parse_request(&buf[..]).expect("Failed to parse http request");
 
     if let Some(req) = req {
         let method = HttpMethod::try_from(req.method).unwrap();
@@ -58,8 +54,7 @@ fn handle_client_request(mut stream: TcpStream) {
                     stream.write_all(b"HTTP/1.1 200 OK\r\n\r\n").unwrap();
                 }
                 "/user-agent" => {
-                    let headers = parse_headers(&lines);
-                    let user_agent = *headers.get("User-Agent").unwrap();
+                    let user_agent = req.headers.get("User-Agent").unwrap();
                     ok(&mut stream, user_agent.as_bytes(), "text/plain");
                 }
                 path => {
@@ -151,18 +146,6 @@ fn ok201(stream: &mut TcpStream, body: &[u8], content_type: &str) {
     stream.write_all(body).unwrap();
 }
 
-fn parse_headers(headers: &Vec<String>) -> HashMap<&str, &str> {
-    headers
-        .iter()
-        .skip(1)
-        .filter(|s| !s.trim().is_empty())
-        .map(|header| {
-            let (key, value) = header.split_once(":").unwrap();
-            (key.trim(), value.trim())
-        })
-        .collect::<HashMap<&str, &str>>()
-}
-
 #[derive(PartialEq, Eq)]
 enum HttpMethod {
     Get,
@@ -183,23 +166,5 @@ impl TryFrom<&str> for HttpMethod {
             b"DELETE" => HttpMethod::Delete,
             _ => return Err(Error::msg("Method not supported!")),
         })
-    }
-}
-
-#[derive(Debug)]
-struct HttpHeader {
-    name: String,
-    value: String,
-}
-
-impl HttpHeader {
-    pub fn new(line: impl AsRef<str>) -> Self {
-        let (k, v) = line.as_ref().split_once(":").unwrap();
-        let k = k.trim();
-        let v = v.trim();
-        HttpHeader {
-            name: k.to_string(),
-            value: v.to_string(),
-        }
     }
 }
