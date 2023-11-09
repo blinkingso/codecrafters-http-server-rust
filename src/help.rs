@@ -21,7 +21,7 @@ pub fn parse_request(request: &[u8]) -> Result<Option<HttpRequest<'_>>> {
         assert_eq!(remaining[i + 1], b'\n');
         i += 1;
         // 0../r/n
-        let line = std::str::from_utf8(&request[..i - 1])?;
+        let line = std::str::from_utf8(&remaining[..i - 1])?;
         if line.is_empty() {
             // /r/n/r/n
             remaining = &remaining[i + 1..];
@@ -86,5 +86,53 @@ mod tests {
         assert!(request.headers.is_empty());
         assert_eq!(request.body_len, 0);
         assert!(request.body.is_none());
+    }
+
+    #[test]
+    fn parse_headers_no_body() {
+        let input =
+            b"GET /index.html HTTP/1.1\r\nHost: localhost:4221\r\nUser-Agent: curl/7.64.1\r\n\r\n";
+        let request = parse_request(input).unwrap();
+
+        let request = request.unwrap();
+        assert_eq!(request.method, "GET");
+        assert_eq!(request.path, "/index.html");
+        assert_eq!(request.headers.len(), 2);
+        assert_eq!(request.headers.get("Host"), Some(&"localhost:4221"));
+        assert_eq!(request.headers.get("User-Agent"), Some(&"curl/7.64.1"));
+        assert_eq!(request.body_len, 0);
+        assert!(request.body.is_none());
+    }
+
+    #[test]
+    fn parse_headers_body() {
+        let input =
+            b"GET /index.html HTTP/1.1\r\nHost: localhost:4221\r\nUser-Agent: curl/7.64.1\r\nContent-Length: 3\r\n\r\nfoo";
+        let request = parse_request(input).unwrap();
+
+        let request = request.unwrap();
+        assert_eq!(request.method, "GET");
+        assert_eq!(request.path, "/index.html");
+        assert_eq!(request.headers.len(), 3);
+        assert_eq!(request.headers.get("Host"), Some(&"localhost:4221"));
+        assert_eq!(request.headers.get("User-Agent"), Some(&"curl/7.64.1"));
+        assert_eq!(request.headers.get("Content-Length"), Some(&"3"));
+        assert_eq!(request.body_len, 3);
+        assert_eq!(request.body.unwrap(), b"foo");
+    }
+
+    #[test]
+    fn parse_incomplete_header() {
+        {
+            let input = b"GET /index.html HTTP/1.1\r\nHost: localhos";
+            let request = parse_request(input).unwrap();
+            assert!(request.is_none());
+        }
+
+        {
+            let input = b"GET /index.html HTTP/1.1\r\nHost: localhost:4221\r\n";
+            let request = parse_request(input).unwrap();
+            assert!(request.is_none());
+        }
     }
 }
