@@ -7,8 +7,11 @@ use std::path::Path;
 
 use anyhow::{Error, Result};
 
+use crate::help::parse_request;
+
 mod byte_str;
 mod header;
+mod help;
 mod method;
 mod status;
 mod version;
@@ -38,18 +41,17 @@ fn main() -> Result<()> {
 
 fn handle_client_request(mut stream: TcpStream) {
     let buf = BufReader::new(&mut stream);
+    let buf = buf.buffer();
+    let req = parse_request(buf).expect("Failed to parse http request");
     let lines: Vec<String> = buf
         .lines()
         .map(|b| b.unwrap())
         .take_while(|line| !line.is_empty())
         .collect();
-    let headers: Vec<HttpHeader> = lines.iter().skip(1).map(HttpHeader::new).collect();
-    println!("http headers: {:?}", headers);
-    if let Some(header) = lines.get(0) {
-        let mut line = header.split_whitespace();
-        let _method = line.next().unwrap();
-        let method = HttpMethod::try_from(_method).unwrap();
-        let path = line.next().unwrap();
+
+    if let Some(req) = req {
+        let method = HttpMethod::try_from(req.method).unwrap();
+        let path = req.path;
         match method {
             HttpMethod::Get => match path {
                 "/" => {
@@ -106,19 +108,9 @@ fn handle_client_request(mut stream: TcpStream) {
 
                     if let Some(file) = path {
                         // ok201(&mut stream, file.as_slice(), "application/octet-stream");
-                        let content_length = headers
-                            .iter()
-                            .find(|h| h.name.eq_ignore_ascii_case("Content-Length"))
-                            .unwrap()
-                            .value
-                            .parse::<usize>()
-                            .unwrap();
-
-                        let mut buf = Vec::new();
-                        stream.read_to_end(&mut buf).unwrap();
-                        println!("{} => {}", buf.len(), content_length);
-                        let start = buf.len() - content_length;
-                        std::fs::write(file, &buf[start..]).unwrap();
+                        if let Some(body) = req.body {
+                            std::fs::write(file, body).unwrap();
+                        }
                         ok201(&mut stream, "write ok".as_bytes(), "text/plain");
                     } else {
                     }
