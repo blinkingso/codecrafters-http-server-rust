@@ -17,7 +17,7 @@ mod version;
 
 fn main() -> Result<()> {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
-    println!("Logs from your program will appear here!");
+    println!("Logs from your program will appear here again!");
 
     // Uncomment this block to pass the first stage
     //
